@@ -14,22 +14,23 @@ from sklearn.metrics import classification_report
 from time import gmtime, strftime
 import pandas as pd
 
-
-
-
-
 INPUTPATH = 'images/movie_pics/elysium019.jpg'
 FIX_IMG_SQR_SIZE = 64
 
+def video_in(filename):
+    pass
+
 def img_in(filename):
-    """read one image from filename and retun image as numpy array"""
+    """read one colour image from filename,
+    return image as numpy array"""
     temp_img = Image.open(filename)
     img = np.array(temp_img)
     name = filename.split('.')[-2]
     return name, img
 
 def img_preprocess(img):
-    """cuts numpy array (image) into squares of 64x64 (FIX_IMG_SQR_SIZE) incl. 3 colour channels"""
+    """cut numpy array (colour image) into squares of 64x64 (FIX_IMG_SQR_SIZE),
+    return squares with associated, x and y coordinates in a dictionary."""
     img_out = []
     x_size = img.shape[0]
     assert x_size > FIX_IMG_SQR_SIZE
@@ -54,65 +55,42 @@ def img_preprocess(img):
 
 def load_model():
     # Model reconstruction from JSON file
-    with open('keras_cnn/model/model_strides_11-24-50.json', 'r') as f: 
+    with open('keras_cnn/model/model_strides_11-24-50.json', 'r') as f:
         model = model_from_json(f.read())
     # Load weights into the new model
     model.load_weights('keras_cnn/model/cnn-model_strides_11-24-50.h5')
     return model
 
+def predict_hot_pxl(sqr, model):
+    """takes a numpy array (colour image) size 64x64 and a ML model,
+    returnes float number between 0 - 1 for hot pixel detection,
+    for 0 no hot pixel detected, 1 hot pixel detected"""
+    predict = model.predict(sqr.reshape(1,64,64,3))
+    y_pred = [i[0] for i in predict]
+    return y_pred
 
 def process():
+    THRESHOLD = 0.5
+    model = load_model()
     name, img = img_in(INPUTPATH)
-    var = img_preprocess(img)
+    squares_dict = img_preprocess(img)
     # optional: save squares
     #Image.fromarray(square).convert("RGB").save(location_squares+label+"_"+str(x)+"_"+str(y)+".png")
-    
-    for sq_info in var:
-        predict = predict_hot_pxl(sq_info['sq'])
+    for sq_info in squares_dict:
+        predict = predict_hot_pxl(sq_info['sq'], model)
+        print(predict)
+        if predict > THRESHOLD:
+            predict = 1
+        else:
+            predict = 0
         sq_info['predict'] = predict
         # dict element sq is now obsolete, remove it
         del sq_info['sq']
+    
+    return squares_dict
+
+
     # report name, hot_pxl_list
-
-def predict_hot_pxl(square):
-
-    return 0
-
-# LOCATION = 'images/'
-# location_src = LOCATION + 'movie_pics/'
-# location_squares = LOCATION + 'squares/'
-# location_squares_error = LOCATION + 'error_squares/'
-# #images = os.listdir(location_src)
-# n_images = len(images)
-# print(f"[INFO] loading {n_images} images from {location_src}...")
-# data = []
-# labels = []
-# b = 0
-
-# # slice images into FIX_IMG_SQR_SIZExFIX_IMG_SQR_SIZE squares
-# # TO DO: fix row selection is not working!
-# for image in images:
-#     label = image.split('.')[-2]
-#     print(label)
-#     labels.append(label)
-
-
-#     img = Image.open(location_squares+'zachariah047_0_192.png')
-#     img = np.array(img)
-#     plt.imshow(img)
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 if __name__ == "__main__":
