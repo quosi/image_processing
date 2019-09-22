@@ -9,13 +9,14 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import random
 from keras.models import model_from_json
-from keras.preprocessing.image import ImageDataGenerator
 from sklearn.metrics import classification_report
 from time import gmtime, strftime
 import pandas as pd
+import collections
 
-INPUTPATH = 'images/movie_pics/elysium019.jpg'
+INPUTPATH = '/home/pepper/Projects/spiced/final_project/images/movie_pics/elysium019.jpg'
 FIX_IMG_SQR_SIZE = 64
+SQ_OUT = collections.namedtuple('SQ_OUT',['sq', 'x', 'y', 'pred_float', 'pred_int'])
 
 def video_in(filename):
     pass
@@ -31,7 +32,7 @@ def img_in(filename):
 def img_preprocess(img):
     """cut numpy array (colour image) into squares of 64x64 (FIX_IMG_SQR_SIZE),
     return squares with associated, x and y coordinates in a dictionary."""
-    img_out = []
+    squares = []
     x_size = img.shape[0]
     assert x_size > FIX_IMG_SQR_SIZE
     y_size = img.shape[1]
@@ -49,16 +50,15 @@ def img_preprocess(img):
                 ystart = y_size-FIX_IMG_SQR_SIZE
                 yend = y_size
             square = img[xstart:xend, ystart:yend,:]
-            sq_info = {'sq': square, 'x': xstart, 'y': ystart}
-            img_out.append(sq_info)
-    return img_out
+            squares.append(SQ_OUT(square, xstart, ystart, 0.0, 0))
+    return squares
 
 def load_model():
     # Model reconstruction from JSON file
-    with open('keras_cnn/model/model_strides_11-24-50.json', 'r') as f:
+    with open('/home/pepper/Projects/spiced/final_project/keras_cnn/model/model_strides_11-24-50.json', 'r') as f:
         model = model_from_json(f.read())
     # Load weights into the new model
-    model.load_weights('keras_cnn/model/cnn-model_strides_11-24-50.h5')
+    model.load_weights('/home/pepper/Projects/spiced/final_project/keras_cnn/model/cnn-model_strides_11-24-50.h5')
     return model
 
 def predict_hot_pxl(sqr, model):
@@ -74,24 +74,23 @@ def process():
     model = load_model()
     name, img = img_in(INPUTPATH)
     squares_dict = img_preprocess(img)
+    print(squares_dict[0].x)
     # optional: save squares
     #Image.fromarray(square).convert("RGB").save(location_squares+label+"_"+str(x)+"_"+str(y)+".png")
-    for sq_info in squares_dict:
-        predict = predict_hot_pxl(sq_info['sq'], model)
-        print(predict)
-        if predict > THRESHOLD:
-            predict = 1
+    for sq in squares_dict:
+        print(sq.x)
+        predict = predict_hot_pxl(sq.sq, model)
+        if predict[0] > THRESHOLD:
+            pred = 1
         else:
-            predict = 0
-        sq_info['predict'] = predict
+            pred = 0
+        sq._replace(pred_float = predict)
+        sq._replace(pred_int = pred)
         # dict element sq is now obsolete, remove it
-        del sq_info['sq']
-    
-    return squares_dict
-
-
+        sq._replace(sq = None)
+    # print(f"name: {name}, first Sqr: {squares_dict[0].sq}, x: {squares_dict[0].x}, y: {squares_dict[0].y}")
+    return name, squares_dict
     # report name, hot_pxl_list
-
 
 if __name__ == "__main__":
     process()
