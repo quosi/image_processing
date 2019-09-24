@@ -5,6 +5,7 @@ to use.
 """
 import os
 import numpy as np
+import cv2
 from PIL import Image
 import matplotlib.pyplot as plt
 import random
@@ -15,7 +16,7 @@ import pandas as pd
 import collections
 import logging
 
-INPUTPATH = '/home/pepper/Projects/spiced/final_project/images/movie_pics/elysium019.jpg'
+INPUTPATH = '/home/pepper/Projects/spiced/final_project/images/videos_errors/D84_h264_errors_px_bl_bl-ed.mp4'
 FIX_IMG_SQR_SIZE = 64
 SQ_OUT = collections.namedtuple('SQ_OUT',['sq', 'x', 'y', 'pred_float', 'pred_int'])
 THRESHOLD = 0.5
@@ -26,13 +27,34 @@ filename='example.log',
 filemode='w',
 level=logging.WARNING)
 
-def video_in(filename):
-    logging.error(filename)
-    return filename
+def video_in(filename=INPUTPATH):
+    """reads (max.20sec!) video file and stores every frame as PNG image for processing
+    returns image name and image files (as np array?)"""
+    #create video capture object
+    cap = cv2.VideoCapture(filename)
+    name = filename.split('/')[-1].split('.')[0]
+    i=0
+    if (cap.isOpened()==False):
+        logging.error('Error opening video stream or file')
+    while(cap.isOpened()):
+        #capture frame-by-frame
+        ret, frame = cap.read()
+        if ret == True:
+            i=i+1
+            cv2.imshow('Frame', frame)
+            Image.fromarray(frame).save(f"images/{name}_{i}.png")
+
+            # Press Q on keyboard to exit
+            if cv2.waitKey(25) & 0xFF == ord('q'):
+                break
+        # Break the loop
+        else:
+            break
+    return f'Frame count of {name}: {i}'
 
 def img_in(filename):
     """read one colour image from filename,
-    return image as numpy array"""
+    return image name and image as numpy array"""
     temp_img = Image.open(filename)
     img = np.array(temp_img)
     name = filename.split('.')[-2]
@@ -63,6 +85,8 @@ def img_preprocess(img):
     return squares
 
 def load_model():
+    """loding predefined CNN model and weights,
+    retuns pretrained CNN model"""
     # Model reconstruction from JSON file
     with open('/home/pepper/Projects/spiced/final_project/keras_cnn/model/model_strides_11-24-50.json', 'r') as f:
         model = model_from_json(f.read())
@@ -78,28 +102,39 @@ def predict_hot_pxl(sqr, model):
     y_pred = [i[0] for i in predict]
     return y_pred
 
-def process():
-    #THRESHOLD = 0.5
+def round_pred_at_threshold(squares_dict, threshold=THRESHOLD):
+    """rounding float numbers of each pred_float element from namedtuple type SQ_OUT,
+    returns 0 or 1 depending on THRESHOLD value"""
+    for sq in squares_dict:
+        predict = sq.predict
+        if predict < threshold:
+            sq.replace(pred_int = 0)
+        else:
+            sq.replace(pred_int = 1)
+    return squares_dict
+
+def process_frame(threshold=THRESHOLD, inputpath=INPUTPATH):
     model = load_model()
-    name, img = img_in(INPUTPATH)
+    name, img = img_in(inputpath)
     squares_dict = img_preprocess(img)
-    print(squares_dict[0].x)
     # optional: save squares
     #Image.fromarray(square).convert("RGB").save(location_squares+label+"_"+str(x)+"_"+str(y)+".png")
     for sq in squares_dict:
         print(sq.x)
         predict = predict_hot_pxl(sq.sq, model)
-        if predict[0] > THRESHOLD:
+        if predict[0] > threshold:
             pred = 1
         else:
             pred = 0
-        sq._replace(pred_float = predict)
+        sq._replace(pred_float = predict[0])
         sq._replace(pred_int = pred)
         # dict element sq is now obsolete, remove it
         sq._replace(sq = None)
     # print(f"name: {name}, first Sqr: {squares_dict[0].sq}, x: {squares_dict[0].x}, y: {squares_dict[0].y}")
+
     return name, squares_dict
     # report name, hot_pxl_list
 
+
 if __name__ == "__main__":
-    process()
+    process_frame()
