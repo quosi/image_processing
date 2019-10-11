@@ -99,6 +99,8 @@ venv.bak/
 
 # mkdocs documentation
 /site
+/flask_app_backup_27-09-2019
+/flask_app_backup_28-09-2019
 
 # mypy
 .mypy_cache/
